@@ -9,34 +9,39 @@ use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
-    //get all products
     public function index()
     {
         try {
             $products = Products::with('category', 'products_image')->paginate(10);
-            return response()->json($products);
+
+            return response()->json([
+                'data' => $products,
+                'message' => 'Products retrieved successfully'
+            ], 200);
         } catch (\Throwable $e) {
             return $this->handleException($e, 'Unable to retrieve products');
         }
     }
 
-    //get details products
     public function show($id)
     {
         try {
             $product = Products::with('category')->find($id);
-            if (!$product) {
+            if (! $product) {
                 return response()->json([
                     'message' => 'Product not found'
                 ], 404);
             }
-            return response()->json($product);
+
+            return response()->json([
+                'data' => $product,
+                'message' => 'Product retrieved successfully'
+            ], 200);
         } catch (\Throwable $e) {
             return $this->handleException($e, 'Unable to retrieve product details');
         }
     }
 
-    //create new products
     public function create(Request $request)
     {
         return $this->store($request);
@@ -56,21 +61,10 @@ class ProductController extends Controller
                 return response()->json(['error' => $validator->errors()], 422);
             }
 
-            $product = new Products();
-            $product->name = $request->name;
-            $product->details = $request->details;
-            $product->price = $request->price;
-            $product->category_id = $request->category_id;
-            $product->save();
+            $product = Products::create($validator->validated());
 
             return response()->json([
-                'data' => [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'details' => $product->details,
-                    'price' => $product->price,
-                    'category_id' => $product->category_id,
-                ],
+                'data' => $product,
                 'message' => 'Product created successfully'
             ], 201);
         } catch (\Throwable $e) {
@@ -82,23 +76,22 @@ class ProductController extends Controller
     {
         try {
             $product = Products::find($id);
-            if (!$product) {
+            if (! $product) {
                 return response()->json(['message' => 'Product not found'], 404);
             }
 
-            if ($request->has('name')) {
-                $product->name = $request->name;
-            }
-            if ($request->has('details')) {
-                $product->details = $request->details;
-            }
-            if ($request->has('price')) {
-                $product->price = $request->price;
-            }
-            if ($request->has('category_id')) {
-                $product->category_id = $request->category_id;
+            $validator = Validator::make($request->all(), [
+                'name' => 'sometimes|required|string|max:255',
+                'details' => 'sometimes|nullable|string|max:255',
+                'price' => 'sometimes|required|numeric',
+                'category_id' => 'sometimes|required|integer|exists:categories,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['error' => $validator->errors()], 422);
             }
 
+            $product->fill($validator->validated());
             $product->save();
 
             return response()->json([
@@ -114,7 +107,7 @@ class ProductController extends Controller
     {
         try {
             $product = Products::find($id);
-            if (!$product) {
+            if (! $product) {
                 return response()->json(['message' => 'Product not found'], 404);
             }
 

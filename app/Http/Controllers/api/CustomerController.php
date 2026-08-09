@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Customers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use App\Models\Customers;
+use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
 {
-    //get all customers
     public function getAllCustomers()
     {
         try {
@@ -30,12 +30,11 @@ class CustomerController extends Controller
         }
     }
 
-    //get customer details
     public function getCustomerDetails($id)
     {
         try {
             $customer = Customers::find($id);
-            if (!$customer) {
+            if (! $customer) {
                 return response()->json([
                     'message' => 'Customer not found'
                 ], 404);
@@ -50,11 +49,10 @@ class CustomerController extends Controller
         }
     }
 
-    //create new customer
-    public function createCustomer(Request $r)
+    public function createCustomer(Request $request)
     {
         try {
-            $validator = Validator::make($r->all(), [
+            $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:customers',
                 'phone_number' => 'required|string|max:15|unique:customers',
@@ -65,23 +63,15 @@ class CustomerController extends Controller
                 'category_id' => 'required|integer|exists:categories,id',
                 'payment_id' => 'required|integer|exists:payments,id',
             ]);
+
             if ($validator->fails()) {
                 return response()->json(['error' => $validator->errors()], 422);
             }
 
+            $customer = Customers::create($validator->validated());
+
             return response()->json([
-                'data' => [
-                    'name' => $r->name,
-                    'email' => $r->email,
-                    'phone_number' => $r->phone_number,
-                    'address' => $r->address,
-                    'bank_id' => $r->bank_id,
-                    'account_name' => $r->account_name,
-                    'product_id' => $r->product_id,
-                    'category_id' => $r->category_id,
-                    'payment_id' => $r->payment_id,
-                    'created_at' => now(),
-                ],
+                'data' => $customer,
                 'message' => 'Customer created successfully'
             ], 201);
         } catch (\Throwable $e) {
@@ -89,44 +79,33 @@ class CustomerController extends Controller
         }
     }
 
-    //update customer
-    public function updateCustomer(Request $r, $id)
+    public function updateCustomer(Request $request, $id)
     {
         try {
             $customer = Customers::find($id);
-            if (!$customer) {
+            if (! $customer) {
                 return response()->json([
                     'message' => 'Customer not found'
                 ], 404);
             }
 
-            if ($r->has('name')) {
-                $customer->name = $r->name;
+            $validator = Validator::make($request->all(), [
+                'name' => 'sometimes|required|string|max:255',
+                'email' => ['sometimes', 'required', 'string', 'email', 'max:255', Rule::unique('customers')->ignore($customer->id)],
+                'phone_number' => ['sometimes', 'required', 'string', 'max:15', Rule::unique('customers')->ignore($customer->id)],
+                'address' => 'sometimes|required|string|max:255',
+                'bank_id' => 'sometimes|required|integer|exists:banks,id',
+                'account_name' => 'sometimes|required|string|max:255',
+                'product_id' => 'sometimes|required|integer|exists:products,id',
+                'category_id' => 'sometimes|required|integer|exists:categories,id',
+                'payment_id' => 'sometimes|required|integer|exists:payments,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['error' => $validator->errors()], 422);
             }
-            if ($r->has('email')) {
-                $customer->email = $r->email;
-            }
-            if ($r->has('phone_number')) {
-                $customer->phone_number = $r->phone_number;
-            }
-            if ($r->has('address')) {
-                $customer->address = $r->address;
-            }
-            if ($r->has('bank_id')) {
-                $customer->bank_id = $r->bank_id;
-            }
-            if ($r->has('account_name')) {
-                $customer->account_name = $r->account_name;
-            }
-            if ($r->has('product_id')) {
-                $customer->product_id = $r->product_id;
-            }
-            if ($r->has('category_id')) {
-                $customer->category_id = $r->category_id;
-            }
-            if ($r->has('payment_id')) {
-                $customer->payment_id = $r->payment_id;
-            }
+
+            $customer->fill($validator->validated());
             $customer->save();
 
             return response()->json([
@@ -138,12 +117,11 @@ class CustomerController extends Controller
         }
     }
 
-    //delete customer
     public function deleteCustomer($id)
     {
         try {
             $customer = Customers::find($id);
-            if (!$customer) {
+            if (! $customer) {
                 return response()->json([
                     'message' => 'Customer not found'
                 ], 404);
